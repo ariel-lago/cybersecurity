@@ -38,9 +38,17 @@ def crawl(current_url, save_dir, domain, recursive,
         if image_url in downloaded:
             continue
         downloaded.add(image_url)
+
         img_name = os.path.basename(path)
+        if not img_name:
+            continue
         filename = os.path.join(save_dir, img_name)
-        
+        base, ext = os.path.splitext(filename)
+        counter = 1
+        while os.path.exists(filename):
+            filename = f"{base}_{counter}{ext}"
+            counter +=1
+            
         try:
             data = requests.get(image_url, timeout=10)
             data.raise_for_status()
@@ -61,22 +69,34 @@ def crawl(current_url, save_dir, domain, recursive,
 def main():
     parser = argparse.ArgumentParser(usage="./spider [-rlp] URL")
     parser.add_argument("-r", action="store_true", help="recursive download")
-    parser.add_argument("-l", type=int, default=5, help="max depth of recursion")
+    parser.add_argument("-l", type=int, default=None, help="max depth of recursion")
     parser.add_argument("-p", type=str, default="./data/", help="save path. Ex: ./images/")
     parser.add_argument("url", help="URL")
 
-    if "-l" in sys.argv and "-r" not in sys.argv:
-        print("error: -l requires -r")
+    args = parser.parse_args()
+    
+    if args.l is not None and not args.r:
+        print("Error: -l requires -r")
         sys.exit(1)
 
-    args = parser.parse_args()
-    os.makedirs(args.p, exist_ok=True)
+    max_depth = args.l if args.l is not None else 5
+    if max_depth < 0:
+        print("Error: level must be positive")
+        sys.exit(1)
+
+    if not args.url.startswith(("http://", "https://")):
+        args.url = "https://" + args.url
 
     domain = urlparse(args.url).netloc
+    if not domain:
+        print("Error: invalid URL")
+        sys.exit(1)
+
+    os.makedirs(args.p, exist_ok=True)
     visited = set()
     downloaded = set()
 
-    crawl(args.url, args.p, domain, args.r, 0, args.l, visited, downloaded)
+    crawl(args.url, args.p, domain, args.r, 0, max_depth, visited, downloaded)
 
 if __name__== "__main__":
     main()
