@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import argparse
@@ -7,14 +9,14 @@ from urllib.parse import urljoin, urlparse
 
 VALID_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".bmp")
 
-def crawl(current_url, save_dir, domain, 
-          recursive, depth, max_depth, visited):
+def crawl(current_url, save_dir, domain, recursive, 
+          depth, max_depth, visited, downloaded):
     # Base case
     if current_url in visited:
         return
     visited.add(current_url)
 
-    print(f"Scanning depth {depth}: {current_url}")
+    print(f"Depth {depth}. Scraping {current_url}")
     try:
         response = requests.get(current_url, timeout=10)
         response.raise_for_status()
@@ -27,11 +29,15 @@ def crawl(current_url, save_dir, domain,
     # Download images on page
     for img in soup.find_all("img", src=True):
         image_url = urljoin(current_url, img["src"])
+
         path = urlparse(image_url).path
 
         if not path.lower().endswith(VALID_EXTENSIONS):
             continue
 
+        if image_url in downloaded:
+            continue
+        downloaded.add(image_url)
         img_name = os.path.basename(path)
         filename = os.path.join(save_dir, img_name)
         
@@ -50,13 +56,13 @@ def crawl(current_url, save_dir, domain,
             next_url = urljoin(current_url, link["href"].split("#")[0])
             if urlparse(next_url).netloc == domain:
                 crawl(next_url, save_dir, domain, recursive, 
-                      depth + 1, max_depth, visited)
+                      depth + 1, max_depth, visited, downloaded)
 
 def main():
     parser = argparse.ArgumentParser(usage="./spider [-rlp] URL")
     parser.add_argument("-r", action="store_true", help="recursive download")
-    parser.add_argument("-l", type=int, default=5, help="max depth")
-    parser.add_argument("-p", type=str, default="./data/", help="save path")
+    parser.add_argument("-l", type=int, default=5, help="max depth of recursion")
+    parser.add_argument("-p", type=str, default="./data/", help="save path. Ex: ./images/")
     parser.add_argument("url", help="URL")
 
     if "-l" in sys.argv and "-r" not in sys.argv:
@@ -68,8 +74,9 @@ def main():
 
     domain = urlparse(args.url).netloc
     visited = set()
+    downloaded = set()
 
-    crawl(args.url, args.p, domain, args.r, 0, args.l, visited)
+    crawl(args.url, args.p, domain, args.r, 0, args.l, visited, downloaded)
 
 if __name__== "__main__":
     main()
