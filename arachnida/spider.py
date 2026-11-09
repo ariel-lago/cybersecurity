@@ -7,12 +7,24 @@ from urllib.parse import urljoin, urlparse
 
 VALID_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".bmp")
 
-def crawl(current_url, save_dir):
-    response = requests.get(current_url, timeout=10)
-    print(response.status_code)
+def crawl(current_url, save_dir, domain, 
+          recursive, depth, max_depth, visited):
+    # Base case
+    if current_url in visited:
+        return
+    visited.add(current_url)
+
+    print(f"Scanning depth {depth}: {current_url}")
+    try:
+        response = requests.get(current_url, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        print("Skipped page:", current_url, e)
+        return
 
     soup = BeautifulSoup(response.text, "html.parser")
 
+    # Download images on page
     for img in soup.find_all("img", src=True):
         image_url = urljoin(current_url, img["src"])
         path = urlparse(image_url).path
@@ -32,10 +44,18 @@ def crawl(current_url, save_dir):
         except Exception as e:
             print("Skipped:", image_url, e)
 
+    # recursion step
+    if recursive and depth < max_depth:
+        for link in soup.find_all("a", href=True):
+            next_url = urljoin(current_url, link["href"].split("#")[0])
+            if urlparse(next_url).netloc == domain:
+                crawl(next_url, save_dir, domain, recursive, 
+                      depth + 1, max_depth, visited)
+
 def main():
     parser = argparse.ArgumentParser(usage="./spider [-rlp] URL")
     parser.add_argument("-r", action="store_true", help="recursive download")
-    parser.add_argument("-l", type=int, default=5, help="max depth level")
+    parser.add_argument("-l", type=int, default=5, help="max depth")
     parser.add_argument("-p", type=str, default="./data/", help="save path")
     parser.add_argument("url", help="URL")
 
@@ -46,7 +66,10 @@ def main():
     args = parser.parse_args()
     os.makedirs(args.p, exist_ok=True)
 
-    crawl(args.url, args.p)
+    domain = urlparse(args.url).netloc
+    visited = set()
+
+    crawl(args.url, args.p, domain, args.r, 0, args.l, visited)
 
 if __name__== "__main__":
     main()
