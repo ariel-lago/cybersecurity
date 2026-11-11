@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+
+import argparse
+from PIL import Image, ExifTags
+
+VALID_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".bmp")
+
+def get_and_print(ifd_data, tag_map=ExifTags.TAGS):
+    for tag_id, value in ifd_data.items():
+        tag_name = tag_map.get(tag_id, tag_id)
+        print(f"{tag_name}: {value}")
+
+def format_exif_data(exif_data):
+    get_and_print(exif_data)
+    exif_ifd = exif_data.get_ifd(ExifTags.IFD.Exif)
+    get_and_print(exif_ifd)
+    gps_ifd = exif_data.get_ifd(ExifTags.IFD.GPSInfo)
+    get_and_print(gps_ifd, ExifTags.GPSTAGS)
+    interop_ifd = exif_data.get_ifd(ExifTags.IFD.Interop)
+    get_and_print(interop_ifd)
+
+def main():
+    parser = argparse.ArgumentParser(usage="./scorpion FILE [FILE2 ...]")
+    parser.add_argument("files", nargs='+', help="image files")
+
+    args = parser.parse_args()
+    
+    for file_path in args.files:
+        with Image.open(file_path) as image:
+            exif_data = image.getexif()
+            if exif_data:
+                format_exif_data(exif_data)
+            else:
+                print(f"No EXIF data found on {file_path}")
+
+
+if __name__== "__main__":
+    main()
+
