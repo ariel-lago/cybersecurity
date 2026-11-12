@@ -5,12 +5,32 @@ from PIL import Image, ExifTags
 
 VALID_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".bmp")
 
-def get_and_print(ifd_data, tag_map=ExifTags.TAGS):
+def format_value(value):
+    stripped = value.strip(b"\x00").strip()
+    if not stripped:
+        return None
+    try:
+        decoded = stripped.decode("utf-8")
+        if decoded.isprintable():
+            return decoded
+    except UnicodeDecodeError:
+        pass
+    return ".".join(str(b) for b in value)    
+
+def get_and_print(ifd_data, tags = ExifTags.TAGS):
+    ignored_tags = {"GPSInfo", "ExifOffset", "ExifInteroperabilityOffset", "MakerNote"}
+
     for tag_id, value in ifd_data.items():
-        tag_name = tag_map.get(tag_id, tag_id)
+        tag_name = tags.get(tag_id, tag_id)
+        if tag_name in ignored_tags:
+            continue
+        if isinstance(value, bytes):
+            value = format_value(value)
+            if value is None:
+                continue
         print(f"{tag_name}: {value}")
 
-def format_exif_data(exif_data):
+def print_format_exif_data(exif_data):
     get_and_print(exif_data)
     exif_ifd = exif_data.get_ifd(ExifTags.IFD.Exif)
     get_and_print(exif_ifd)
@@ -29,7 +49,7 @@ def main():
         with Image.open(file_path) as image:
             exif_data = image.getexif()
             if exif_data:
-                format_exif_data(exif_data)
+                print_format_exif_data(exif_data)
             else:
                 print(f"No EXIF data found on {file_path}")
 
